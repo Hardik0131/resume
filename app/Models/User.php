@@ -54,4 +54,8 @@ class User extends Authenticatable
     public function listings(){
         return $this->hasMany(Listing::class);
     }
+
+    public function applications(){
+        return $this->hasMany(Application::class);
+    }
 }
