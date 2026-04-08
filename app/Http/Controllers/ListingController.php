@@ -6,7 +6,6 @@ use App\Models\Listing;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Str;
-use PhpParser\Node\Expr\List_;
 
 class ListingController extends Controller
 {
@@ -54,7 +53,8 @@ class ListingController extends Controller
         $request->validate(
             [
                 'job_title' => 'required',
-                'department' => 'nullable',
+                'slug' => 'nullable|unique:listings,slug',
+                'company_name' => 'nullable',
                 'location' => 'required',
                 'work_type' => 'required|in:Remote,On-site,Hybrid',
                 'employment_type' => 'required|in:Full-time,Part-time,Contract,Internship',
@@ -67,8 +67,9 @@ class ListingController extends Controller
                 'required_skills' => 'nullable',
                 'required_skills.*' => 'string',
                 'application_link' => 'nullable',
+                'status' => 'nullable|in:draft,active',
                 'closing_date' => 'nullable|date|after_or_equal:today',
-                'slug' => 'nullable|unique:listings,slug',
+                'published_at' => 'nullable|date',
             ],
             [
                 'job_title.required' => 'Job title is required.',
@@ -102,6 +103,66 @@ class ListingController extends Controller
         Listing::create([
             'user_id' => Auth::user()->id,
             'job_title' => $request->job_title,
+            'slug' => $slug,
+            'company_name' => $request->company_name,
+            'location' => $request->location,
+            'work_type' => $request->work_type,
+            'employment_type' => $request->employment_type,
+            'experience_level' => $request->experience_level,
+            'min_salary' => $request->min_salary,
+            'max_salary' => $request->max_salary,
+            'currency' => $request->currency,
+            'hiring_urgency' => $request->hiring_urgency,
+            'job_description' => $request->job_description,
+            'required_skills' => $request->required_skills ? json_encode($request->required_skills) : null,
+            'application_link' => $request->application_link,
+            'closing_date' => $request->closing_date,
+            'published_at' => !$request->is_draft ? now() : null,
+        ]);
+
+        if ($request->is_draft) {
+            return back()->with('success', 'Draft Saved Successfully!');
+        } else {
+            return back()->with('success', 'Job Listing Created Successfully!');
+        }
+    }
+
+    public function updateDraft(Request $request, $slug)
+    {
+        $listing = Listing::where('slug', $slug)->where('user_id', Auth::user()->id)->firstOrFail();
+
+        $request->validate(
+            [
+                'job_title' => 'required',
+                'department' => 'nullable',
+                'location' => 'required',
+                'work_type' => 'required|in:Remote,On-site,Hybrid',
+                'employment_type' => 'required|in:Full-time,Part-time,Contract,Internship',
+                'experience_level' => 'required|in:Junior,Mid,Senior,Lead',
+                'min_salary' => 'nullable|numeric',
+                'max_salary' => 'nullable|numeric|gte:min_salary',
+                'currency' => 'required|in:USD,EUR,INR',
+                'hiring_urgency' => 'required|in:Normal,High,Urgent',
+                'job_description' => 'required',
+                'required_skills' => 'nullable',
+                'required_skills.*' => 'string',
+                'application_link' => 'nullable',
+                'closing_date' => 'nullable|date|after_or_equal:today',
+                'slug' => 'nullable|unique:listings,slug,' . $listing->id,
+            ],
+            [
+                // validation messages...
+            ]
+        );
+
+        $slug = Str::slug($request->job_title);
+        $count = Listing::where('slug', 'LIKE', "{$slug}%")->where('id', '!=', $listing->id)->count();
+        if ($count) {
+            $slug .= '-' . ($count + 1);
+        }
+
+        $listing->update([
+            'job_title' => $request->job_title,
             'department' => $request->department,
             'location' => $request->location,
             'work_type' => $request->work_type,
@@ -118,7 +179,7 @@ class ListingController extends Controller
             'slug' => $slug,
         ]);
 
-        return back()->with('success', 'Job Listing Created Successfully!');
+        return back()->with('success', 'Draft Updated Successfully!');
     }
 
     /**

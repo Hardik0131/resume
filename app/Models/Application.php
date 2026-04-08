@@ -18,6 +18,7 @@ class Application extends Model
         'status',
         'is_applied',
         'is_saved',
+        'saved_updated_at',
     ];
 
     public function user(){
