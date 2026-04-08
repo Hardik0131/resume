@@ -12,7 +12,8 @@ class Listing extends Model
     protected $fillable = [
         'user_id',
         'job_title',
-        'department',
+        'slug',
+        'company_name',
         'location',
         'work_type',
         'employment_type',
@@ -26,7 +27,7 @@ class Listing extends Model
         'application_link',
         'status',
         'closing_date',
-        'slug',
+        'published_at',
     ];
 
     // match the score of a resume against the required skills of the job listing
@@ -48,7 +49,7 @@ class Listing extends Model
         $jobSkillsCount = count($jobSkillsArray);
         if ($jobSkillsCount === 0) return 0;
 
-        return round(($matches / $jobSkillsCount) * 100);    
+        return round(($matches / $jobSkillsCount) * 100);
     }
 
     public function user()
