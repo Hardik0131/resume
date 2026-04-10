@@ -14,7 +14,8 @@ class ListingController extends Controller
      */
     public function index()
     {
-        return view('recruiter.post-job');
+        $draftJobCard = Listing::where('user_id', Auth::user()->id)->where('status', 'draft')->latest()->first();
+        return view('recruiter.post-job', compact('draftJobCard'));
     }
 
     public function allJobs()
@@ -35,6 +36,29 @@ class ListingController extends Controller
         return view('jobseeker.job-detail', [
             'job' => $listing,
         ]);
+    }
+
+    public function allPostings()
+    {
+        $baseQuery = Listing::where('user_id', Auth::id());
+
+        $listings = (clone $baseQuery)
+            ->orderByDesc('created_at')
+            ->paginate(3)
+            ->withQueryString();
+
+        $activeRoleCount = (clone $baseQuery)
+            ->where('status', 'active')
+            ->count();
+
+        $closingSoonCount = (clone $baseQuery)
+            ->where('status', 'active')
+            ->whereNotNull('closing_date')
+            ->where('closing_date', '>=', now())
+            ->where('closing_date', '<=', now()->endOfMonth())
+            ->count();
+
+        return view('recruiter.job-posting', compact('listings', 'activeRoleCount', 'closingSoonCount'));
     }
 
     /**
@@ -100,6 +124,14 @@ class ListingController extends Controller
             $slug .= '-' . ($count + 1);
         }
 
+        $action = $request->input('action');
+
+        if($action === 'draft'){
+            $request->merge(['status' => 'draft']);
+        } else {
+            $request->merge(['status' => 'active']);
+        }
+
         Listing::create([
             'user_id' => Auth::user()->id,
             'job_title' => $request->job_title,
@@ -117,10 +149,11 @@ class ListingController extends Controller
             'required_skills' => $request->required_skills ? json_encode($request->required_skills) : null,
             'application_link' => $request->application_link,
             'closing_date' => $request->closing_date,
-            'published_at' => !$request->is_draft ? now() : null,
+            'published_at' => $action === 'publish' ? now() : null,
+            'status' => $request->status,
         ]);
 
-        if ($request->is_draft) {
+        if ($action === 'draft') {
             return back()->with('success', 'Draft Saved Successfully!');
         } else {
             return back()->with('success', 'Job Listing Created Successfully!');
@@ -134,7 +167,7 @@ class ListingController extends Controller
         $request->validate(
             [
                 'job_title' => 'required',
-                'department' => 'nullable',
+                'company_name' => 'nullable',
                 'location' => 'required',
                 'work_type' => 'required|in:Remote,On-site,Hybrid',
                 'employment_type' => 'required|in:Full-time,Part-time,Contract,Internship',
@@ -161,9 +194,17 @@ class ListingController extends Controller
             $slug .= '-' . ($count + 1);
         }
 
+        $action = $request->input('action');
+
+        if($action === 'draft'){
+            $request->merge(['status' => 'draft']);
+        } else {
+            $request->merge(['status' => 'active']);
+        }
+
         $listing->update([
             'job_title' => $request->job_title,
-            'department' => $request->department,
+            'company_name' => $request->company_name,
             'location' => $request->location,
             'work_type' => $request->work_type,
             'employment_type' => $request->employment_type,
@@ -177,9 +218,15 @@ class ListingController extends Controller
             'application_link' => $request->application_link,
             'closing_date' => $request->closing_date,
             'slug' => $slug,
+            'status' => $request->status,
+            'published_at' => $action === 'publish' ? now() : null,
         ]);
 
-        return back()->with('success', 'Draft Updated Successfully!');
+        if ($action === 'draft') {
+            return redirect()->route('recruiter.post-job')->with('success', 'Draft Updated Successfully!');
+        } else {
+            return redirect()->route('recruiter.post-job')->with('success', 'Job Listing Updated Successfully!');
+        }
     }
 
     /**
